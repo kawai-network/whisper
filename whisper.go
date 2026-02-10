@@ -5,11 +5,13 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"unsafe"
 
 	"github.com/ebitengine/purego"
 	"github.com/go-audio/wav"
+	"github.com/klauspost/cpuid/v2"
 )
 
 // Whisper struct encapsulates the library instance and its methods
@@ -27,14 +29,34 @@ type Whisper struct {
 	cppGetSegmentSpeakerTurnNext func(i int) bool
 }
 
-// New creates a new Whisper instance by loading the shared library at libPath
+// New creates a new Whisper instance.
+// If libPath is a file, it loads that file.
+// If libPath is a directory, it attempts to find the best available library in that directory.
+// If libPath is empty, it attempts to find the best available library in the current directory or defaults.
 func New(libPath string) (*Whisper, error) {
 	w := &Whisper{}
 
+	var path string
+	var err error
+
+	if libPath == "" {
+		libPath = "."
+	}
+
+	info, err := os.Stat(libPath)
+	if err == nil && info.IsDir() {
+		path = findBestLibrary(libPath)
+		if path == "" {
+			return nil, fmt.Errorf("no suitable whisper library found in %s", libPath)
+		}
+	} else {
+		path = libPath
+	}
+
 	// Load the library
-	lib, err := purego.Dlopen(libPath, purego.RTLD_NOW|purego.RTLD_GLOBAL)
+	lib, err := purego.Dlopen(path, purego.RTLD_NOW|purego.RTLD_GLOBAL)
 	if err != nil {
-		return nil, fmt.Errorf("failed to open library at %s: %w", libPath, err)
+		return nil, fmt.Errorf("failed to open library at %s: %w", path, err)
 	}
 
 	// Register function pointers
@@ -50,6 +72,47 @@ func New(libPath string) (*Whisper, error) {
 	purego.RegisterLibFunc(&w.cppGetSegmentSpeakerTurnNext, lib, "get_segment_speaker_turn_next")
 
 	return w, nil
+}
+
+func findBestLibrary(dir string) string {
+	if runtime.GOOS == "darwin" {
+		// macOS only has fallback/default
+		path := filepath.Join(dir, "libgowhisper-fallback.so")
+		if _, err := os.Stat(path); err == nil {
+			return path
+		}
+		return ""
+	}
+
+	// Linux: Check for AVX512, then AVX2, then AVX, then fallback
+	if cpuid.CPU.Has(cpuid.AVX512F) {
+		path := filepath.Join(dir, "libgowhisper-avx512.so")
+		if _, err := os.Stat(path); err == nil {
+			return path
+		}
+	}
+
+	if cpuid.CPU.Has(cpuid.AVX2) {
+		path := filepath.Join(dir, "libgowhisper-avx2.so")
+		if _, err := os.Stat(path); err == nil {
+			return path
+		}
+	}
+
+	if cpuid.CPU.Has(cpuid.AVX) {
+		path := filepath.Join(dir, "libgowhisper-avx.so")
+		if _, err := os.Stat(path); err == nil {
+			return path
+		}
+	}
+
+	// Fallback
+	path := filepath.Join(dir, "libgowhisper-fallback.so")
+	if _, err := os.Stat(path); err == nil {
+		return path
+	}
+
+	return ""
 }
 
 // ModelOptions represents options for loading a model
