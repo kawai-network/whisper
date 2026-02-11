@@ -3,6 +3,14 @@ project(gowhisper LANGUAGES C CXX)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+# Windows: Use static runtime for all targets to avoid VC++ Redistributable dependency
+if(WIN32 AND MSVC)
+    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+    # Apply to all targets including whisper and ggml
+    set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} /MT")
+    set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /MT")
+endif()
+
 add_subdirectory(../sources/whisper.cpp whisper-build)
 
 # Define export macro for Windows DLL
@@ -29,8 +37,5 @@ if(WIN32)
     # On Windows, the output is a .dll file
     if(MSVC)
         target_compile_options(gowhisper PRIVATE /W4)
-        # Use static runtime to avoid dependency on VC++ Redistributable
-        set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
-        target_compile_options(gowhisper PRIVATE /MT)
     endif()
 endif()
