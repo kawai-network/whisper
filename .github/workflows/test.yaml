@@ -41,6 +41,17 @@ jobs:
         if: runner.os == 'Windows'
         uses: ilammy/msvc-dev-cmd@v1
 
+      - name: Install Visual C++ Redistributable (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Write-Host "Installing Visual C++ Redistributable..."
+          $url = "https://aka.ms/vs/17/release/vc_redist.x64.exe"
+          $output = "$env:TEMP\vc_redist.x64.exe"
+          Invoke-WebRequest -Uri $url -OutFile $output
+          Start-Process -FilePath $output -ArgumentList "/install", "/quiet", "/norestart" -Wait
+          Write-Host "Visual C++ Redistributable installed"
+
       - name: Get Libraries - Linux
         if: runner.os == 'Linux'
         run: |
