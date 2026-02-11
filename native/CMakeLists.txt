@@ -11,6 +11,9 @@ if(WIN32 AND MSVC)
     set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /MT")
 endif()
 
+# Build whisper and ggml as static libraries so they are linked into gowhisper.dll
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "Build shared libraries" FORCE)
+
 add_subdirectory(../sources/whisper.cpp whisper-build)
 
 # Define export macro for Windows DLL
