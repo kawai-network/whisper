@@ -22,26 +22,20 @@ jobs:
         run: |
           sudo apt-get update && sudo apt-get install -y ffmpeg build-essential cmake
 
-      - name: Clone whisper.cpp source
+      - name: Download Pre-built Libraries
         run: |
-          make sources/whisper.cpp
-
-      - name: Build Libraries (C++)
-        run: |
-          # Build all library variants
-          make libgowhisper-fallback.so
-          make libgowhisper-avx.so || echo "AVX build failed, continuing..."
-          make libgowhisper-avx2.so || echo "AVX2 build failed, continuing..."
-          make libgowhisper-avx512.so || echo "AVX512 build failed, continuing..."
+          # Get the latest release tag
+          LATEST_TAG=$(curl -s https://api.github.com/repos/kawai-network/whisper/releases/latest | jq -r .tag_name)
+          echo "Latest release: $LATEST_TAG"
           
-      - name: Verify libraries exist
-        run: |
-          echo "Listing built libraries:"
-          ls -lh libgowhisper-*.so || echo "No libraries found!"
-          echo "Current directory:"
-          pwd
-          echo "Directory contents:"
-          ls -la
+          # Download the ubuntu libraries from the latest release
+          wget -q https://github.com/kawai-network/whisper/releases/download/$LATEST_TAG/libgowhisper-fallback.so -O libgowhisper-fallback.so || echo "Fallback not found"
+          wget -q https://github.com/kawai-network/whisper/releases/download/$LATEST_TAG/libgowhisper-avx.so -O libgowhisper-avx.so || echo "AVX not found"
+          wget -q https://github.com/kawai-network/whisper/releases/download/$LATEST_TAG/libgowhisper-avx2.so -O libgowhisper-avx2.so || echo "AVX2 not found"
+          wget -q https://github.com/kawai-network/whisper/releases/download/$LATEST_TAG/libgowhisper-avx512.so -O libgowhisper-avx512.so || echo "AVX512 not found"
+          
+          # List what we got
+          ls -lh libgowhisper-*.so
 
       - name: Download Test Data (Model)
         run: |
