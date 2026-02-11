@@ -39,6 +39,13 @@ jobs:
               wget -q https://github.com/kawai-network/whisper/releases/download/$LATEST_TAG/libgowhisper-avx2.so -O libgowhisper-avx2.so || true
               wget -q https://github.com/kawai-network/whisper/releases/download/$LATEST_TAG/libgowhisper-avx512.so -O libgowhisper-avx512.so || true
               ls -lh libgowhisper-*.so
+              
+              # Debug: Check library dependencies
+              echo "Checking library dependencies:"
+              for lib in libgowhisper-*.so; do
+                echo "=== $lib ==="
+                ldd "$lib" || echo "ldd failed for $lib"
+              done
             else
               echo "Download failed, building from source..."
               make sources/whisper.cpp
