@@ -8,7 +8,10 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
     steps:
       - uses: actions/checkout@v4
         with:
@@ -18,9 +21,15 @@ jobs:
         with:
           go-version: '1.23'
 
-      - name: Install Dependencies
+      - name: Install Dependencies (Linux)
+        if: runner.os == 'Linux'
         run: |
           sudo apt-get update && sudo apt-get install -y ffmpeg build-essential cmake libgomp1 libstdc++6
+
+      - name: Install Dependencies (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install ffmpeg cmake
 
       - name: Get Libraries (Download or Build)
         run: |

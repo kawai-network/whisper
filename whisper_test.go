@@ -1,42 +1,59 @@
 package whisper
 
 import (
-	"fmt"
 	"os"
 	"testing"
 )
 
-func TestTranscribe(t *testing.T) {
-	// 1. Setup paths
-	// We need a model file and an audio file.
-	// For CI/testing, we can download tiny model and a short audio sample.
+func TestLibraryLoading(t *testing.T) {
+	// Test that we can load the library
+	w, err := New(".")
+	if err != nil {
+		t.Fatalf("Failed to initialize whisper: %v", err)
+	}
+	if w == nil {
+		t.Fatal("Expected non-nil Whisper instance")
+	}
+}
+
+func TestModelLoading(t *testing.T) {
 	modelPath := "test/data/ggml-tiny.en.bin"
-	audioPath := "test/data/jfk.wav"
 
-	// Ensure test data exists (in a real scenario, you'd likely have a setup step or standard test data)
 	if _, err := os.Stat(modelPath); os.IsNotExist(err) {
-		t.Skipf("Skipping test: model file not found at %s. Please download a model (e.g. ggml-tiny.en.bin) to run this test.", modelPath)
-	}
-	if _, err := os.Stat(audioPath); os.IsNotExist(err) {
-		t.Skipf("Skipping test: audio file not found at %s. Please provide a waiver audio file.", audioPath)
+		t.Skipf("Skipping test: model file not found at %s", modelPath)
 	}
 
-	// 2. Initialize Whisper
-	// We assume libraries are built in the current directory or a known location.
-	// In CI, we will ensure they are built.
-	libPath := "." // Start looking in current dir
-	w, err := New(libPath)
+	w, err := New(".")
 	if err != nil {
 		t.Fatalf("Failed to initialize whisper: %v", err)
 	}
 
-	// 3. Load Model
+	// Test loading transcription model
+	if err := w.Load(modelPath); err != nil {
+		t.Fatalf("Failed to load model: %v", err)
+	}
+}
+
+func TestTranscribeBasic(t *testing.T) {
+	modelPath := "test/data/ggml-tiny.en.bin"
+	audioPath := "test/data/jfk.wav"
+
+	if _, err := os.Stat(modelPath); os.IsNotExist(err) {
+		t.Skipf("Skipping test: model file not found at %s", modelPath)
+	}
+	if _, err := os.Stat(audioPath); os.IsNotExist(err) {
+		t.Skipf("Skipping test: audio file not found at %s", audioPath)
+	}
+
+	w, err := New(".")
+	if err != nil {
+		t.Fatalf("Failed to initialize whisper: %v", err)
+	}
+
 	if err := w.Load(modelPath); err != nil {
 		t.Fatalf("Failed to load model: %v", err)
 	}
 
-	// 4. Run Transcription
-	// Use minimal options for testing
 	opts := TranscriptionOptions{
 		Language: "en",
 		Threads:  1,
@@ -47,15 +64,137 @@ func TestTranscribe(t *testing.T) {
 		t.Fatalf("Failed to transcribe: %v", err)
 	}
 
-	// 5. Assertions
-	fmt.Printf("Transcription: %s\n", res.Text)
+	// Assertions
 	if len(res.Text) == 0 {
 		t.Error("Expected transcription text, got empty string")
 	}
 
-	// Basic check for content (JFK sample usually contains "Ask not what your country...")
-	// We do a loose check.
 	if len(res.Segments) == 0 {
 		t.Error("Expected at least one segment")
+	}
+
+	// Log the result for manual verification
+	t.Logf("Transcription: %s", res.Text)
+	t.Logf("Number of segments: %d", len(res.Segments))
+}
+
+func TestTranscribeWithMultipleThreads(t *testing.T) {
+	modelPath := "test/data/ggml-tiny.en.bin"
+	audioPath := "test/data/jfk.wav"
+
+	if _, err := os.Stat(modelPath); os.IsNotExist(err) {
+		t.Skipf("Skipping test: model file not found at %s", modelPath)
+	}
+	if _, err := os.Stat(audioPath); os.IsNotExist(err) {
+		t.Skipf("Skipping test: audio file not found at %s", audioPath)
+	}
+
+	w, err := New(".")
+	if err != nil {
+		t.Fatalf("Failed to initialize whisper: %v", err)
+	}
+
+	if err := w.Load(modelPath); err != nil {
+		t.Fatalf("Failed to load model: %v", err)
+	}
+
+	opts := TranscriptionOptions{
+		Language: "en",
+		Threads:  4, // Use multiple threads
+	}
+
+	res, err := w.Transcribe(audioPath, opts)
+	if err != nil {
+		t.Fatalf("Failed to transcribe with multiple threads: %v", err)
+	}
+
+	if len(res.Text) == 0 {
+		t.Error("Expected transcription text, got empty string")
+	}
+
+	t.Logf("Transcription (4 threads): %s", res.Text)
+}
+
+func TestTranscribeWithDiarization(t *testing.T) {
+	modelPath := "test/data/ggml-tiny.en.bin"
+	audioPath := "test/data/jfk.wav"
+
+	if _, err := os.Stat(modelPath); os.IsNotExist(err) {
+		t.Skipf("Skipping test: model file not found at %s", modelPath)
+	}
+	if _, err := os.Stat(audioPath); os.IsNotExist(err) {
+		t.Skipf("Skipping test: audio file not found at %s", audioPath)
+	}
+
+	w, err := New(".")
+	if err != nil {
+		t.Fatalf("Failed to initialize whisper: %v", err)
+	}
+
+	if err := w.Load(modelPath); err != nil {
+		t.Fatalf("Failed to load model: %v", err)
+	}
+
+	opts := TranscriptionOptions{
+		Language: "en",
+		Threads:  2,
+		Diarize:  true, // Enable speaker diarization
+	}
+
+	res, err := w.Transcribe(audioPath, opts)
+	if err != nil {
+		t.Fatalf("Failed to transcribe with diarization: %v", err)
+	}
+
+	if len(res.Text) == 0 {
+		t.Error("Expected transcription text, got empty string")
+	}
+
+	t.Logf("Transcription (with diarization): %s", res.Text)
+}
+
+func TestSegmentDetails(t *testing.T) {
+	modelPath := "test/data/ggml-tiny.en.bin"
+	audioPath := "test/data/jfk.wav"
+
+	if _, err := os.Stat(modelPath); os.IsNotExist(err) {
+		t.Skipf("Skipping test: model file not found at %s", modelPath)
+	}
+	if _, err := os.Stat(audioPath); os.IsNotExist(err) {
+		t.Skipf("Skipping test: audio file not found at %s", audioPath)
+	}
+
+	w, err := New(".")
+	if err != nil {
+		t.Fatalf("Failed to initialize whisper: %v", err)
+	}
+
+	if err := w.Load(modelPath); err != nil {
+		t.Fatalf("Failed to load model: %v", err)
+	}
+
+	opts := TranscriptionOptions{
+		Language: "en",
+		Threads:  1,
+	}
+
+	res, err := w.Transcribe(audioPath, opts)
+	if err != nil {
+		t.Fatalf("Failed to transcribe: %v", err)
+	}
+
+	// Check segment details
+	for i, seg := range res.Segments {
+		if seg.Start >= seg.End {
+			t.Errorf("Segment %d: start time (%d) should be less than end time (%d)", i, seg.Start, seg.End)
+		}
+		if len(seg.Text) == 0 {
+			t.Errorf("Segment %d: expected non-empty text", i)
+		}
+		if seg.Id != int32(i) {
+			t.Errorf("Segment %d: expected ID %d, got %d", i, i, seg.Id)
+		}
+
+		t.Logf("Segment %d: [%d-%d] %s (tokens: %d)", i, seg.Start, seg.End, seg.Text, len(seg.Tokens))
 	}
 }
