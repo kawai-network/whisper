@@ -10,7 +10,6 @@ import (
 	"unsafe"
 
 	"github.com/go-audio/wav"
-	"github.com/klauspost/cpuid/v2"
 )
 
 // Whisper struct encapsulates the library instance and its methods
@@ -113,44 +112,9 @@ func findBestLibrary(dir string) string {
 		prefix = ""
 	}
 
-	// Windows and macOS only have fallback/default
-	if runtime.GOOS == "darwin" || runtime.GOOS == "windows" {
-		path := filepath.Join(dir, prefix+"gowhisper-fallback"+ext)
-		if _, err := os.Stat(path); err == nil {
-			return path
-		}
-		// Try without "-fallback" suffix for compatibility
-		path = filepath.Join(dir, prefix+"gowhisper"+ext)
-		if _, err := os.Stat(path); err == nil {
-			return path
-		}
-		return ""
-	}
-
-	// Linux: Check for AVX512, then AVX2, then AVX, then fallback
-	if cpuid.CPU.Has(cpuid.AVX512F) {
-		path := filepath.Join(dir, "libgowhisper-avx512.so")
-		if _, err := os.Stat(path); err == nil {
-			return path
-		}
-	}
-
-	if cpuid.CPU.Has(cpuid.AVX2) {
-		path := filepath.Join(dir, "libgowhisper-avx2.so")
-		if _, err := os.Stat(path); err == nil {
-			return path
-		}
-	}
-
-	if cpuid.CPU.Has(cpuid.AVX) {
-		path := filepath.Join(dir, "libgowhisper-avx.so")
-		if _, err := os.Stat(path); err == nil {
-			return path
-		}
-	}
-
-	// Fallback
-	path := filepath.Join(dir, "libgowhisper-fallback.so")
+	// Always use fallback variant for maximum compatibility
+	// This avoids SIGILL errors on CPUs that don't support AVX/AVX2/AVX512
+	path := filepath.Join(dir, prefix+"gowhisper-fallback"+ext)
 	if _, err := os.Stat(path); err == nil {
 		return path
 	}
