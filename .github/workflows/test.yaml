@@ -33,30 +33,46 @@ jobs:
 
       - name: Get Libraries (Download or Build)
         run: |
-          # Try to download from latest release first
-          LATEST_TAG=$(curl -s https://api.github.com/repos/kawai-network/whisper/releases/latest | jq -r .tag_name)
-          
-          if [ "$LATEST_TAG" != "null" ] && [ -n "$LATEST_TAG" ]; then
-            echo "Found latest release: $LATEST_TAG"
-            echo "Attempting to download pre-built libraries..."
+          if [ "${{ runner.os }}" == "macOS" ]; then
+            echo "macOS detected, building from source to ensure compatibility..."
+            make sources/whisper.cpp
+            make libgowhisper-fallback.so
+            ls -lh libgowhisper-*.so
+            echo "Checking library dependencies (macOS):"
+            otool -L libgowhisper-fallback.so
+          else
+            # Linux: Try to download from latest release first
+            LATEST_TAG=$(curl -s https://api.github.com/repos/kawai-network/whisper/releases/latest | jq -r .tag_name)
             
-            wget -q https://github.com/kawai-network/whisper/releases/download/$LATEST_TAG/libgowhisper-fallback.so -O libgowhisper-fallback.so && DOWNLOADED=true || DOWNLOADED=false
-            
-            if [ "$DOWNLOADED" = "true" ]; then
-              echo "Successfully downloaded libraries from release"
-              wget -q https://github.com/kawai-network/whisper/releases/download/$LATEST_TAG/libgowhisper-avx.so -O libgowhisper-avx.so || true
-              wget -q https://github.com/kawai-network/whisper/releases/download/$LATEST_TAG/libgowhisper-avx2.so -O libgowhisper-avx2.so || true
-              wget -q https://github.com/kawai-network/whisper/releases/download/$LATEST_TAG/libgowhisper-avx512.so -O libgowhisper-avx512.so || true
-              ls -lh libgowhisper-*.so
+            if [ "$LATEST_TAG" != "null" ] && [ -n "$LATEST_TAG" ]; then
+              echo "Found latest release: $LATEST_TAG"
+              echo "Attempting to download pre-built libraries..."
               
-              # Debug: Check library dependencies
-              echo "Checking library dependencies:"
-              for lib in libgowhisper-*.so; do
-                echo "=== $lib ==="
-                ldd "$lib" || echo "ldd failed for $lib"
-              done
+              wget -q https://github.com/kawai-network/whisper/releases/download/$LATEST_TAG/libgowhisper-fallback.so -O libgowhisper-fallback.so && DOWNLOADED=true || DOWNLOADED=false
+              
+              if [ "$DOWNLOADED" = "true" ]; then
+                echo "Successfully downloaded libraries from release"
+                wget -q https://github.com/kawai-network/whisper/releases/download/$LATEST_TAG/libgowhisper-avx.so -O libgowhisper-avx.so || true
+                wget -q https://github.com/kawai-network/whisper/releases/download/$LATEST_TAG/libgowhisper-avx2.so -O libgowhisper-avx2.so || true
+                wget -q https://github.com/kawai-network/whisper/releases/download/$LATEST_TAG/libgowhisper-avx512.so -O libgowhisper-avx512.so || true
+                ls -lh libgowhisper-*.so
+                
+                echo "Checking library dependencies (Linux):"
+                for lib in libgowhisper-*.so; do
+                  echo "=== $lib ==="
+                  ldd "$lib" || echo "ldd failed for $lib"
+                done
+              else
+                echo "Download failed, building from source..."
+                make sources/whisper.cpp
+                make libgowhisper-fallback.so
+                make libgowhisper-avx.so || true
+                make libgowhisper-avx2.so || true
+                make libgowhisper-avx512.so || true
+                ls -lh libgowhisper-*.so
+              fi
             else
-              echo "Download failed, building from source..."
+              echo "No release found, building from source..."
               make sources/whisper.cpp
               make libgowhisper-fallback.so
               make libgowhisper-avx.so || true
@@ -64,14 +80,6 @@ jobs:
               make libgowhisper-avx512.so || true
               ls -lh libgowhisper-*.so
             fi
-          else
-            echo "No release found, building from source..."
-            make sources/whisper.cpp
-            make libgowhisper-fallback.so
-            make libgowhisper-avx.so || true
-            make libgowhisper-avx2.so || true
-            make libgowhisper-avx512.so || true
-            ls -lh libgowhisper-*.so
           fi
 
       - name: Download Test Data (Model)

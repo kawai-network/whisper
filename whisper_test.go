@@ -198,3 +198,36 @@ func TestSegmentDetails(t *testing.T) {
 		t.Logf("Segment %d: [%d-%d] %s (tokens: %d)", i, seg.Start, seg.End, seg.Text, len(seg.Tokens))
 	}
 }
+
+func TestInvalidModelPath(t *testing.T) {
+	w, err := New(".")
+	if err != nil {
+		t.Fatalf("Failed to initialize whisper: %v", err)
+	}
+
+	err = w.Load("non_existent_model.bin")
+	if err == nil {
+		t.Error("Expected error when loading non-existent model, got nil")
+	}
+}
+
+func TestInvalidAudioPath(t *testing.T) {
+	modelPath := "test/data/ggml-tiny.en.bin"
+	if _, err := os.Stat(modelPath); os.IsNotExist(err) {
+		t.Skip("Model file not found")
+	}
+
+	w, err := New(".")
+	if err != nil {
+		t.Fatalf("Failed to initialize whisper: %v", err)
+	}
+
+	if err := w.Load(modelPath); err != nil {
+		t.Fatalf("Failed to load model: %v", err)
+	}
+
+	_, err = w.Transcribe("non_existent_audio.wav", TranscriptionOptions{})
+	if err == nil {
+		t.Error("Expected error when transcribing non-existent audio, got nil")
+	}
+}
