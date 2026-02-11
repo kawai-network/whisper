@@ -14,7 +14,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        os: [ubuntu-latest, macos-latest, windows-latest]
 
     steps:
       - name: Checkout code
@@ -38,19 +38,34 @@ jobs:
         run: |
           brew install cmake
 
-      - name: Build Libraries
+      - name: Setup MSVC (Windows)
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Build Libraries (Linux & macOS)
+        if: runner.os != 'Windows'
         run: |
-          # The makefile handles cloning the submodule if not present, but we did checkout with submodules.
-          # We just need to trigger the build.
-          # 'make whisper' will build the go code + the variant targets.
-          # We can just build the variants directly to save time/avoid go build if not strictly needed, 
-          # but 'make whisper' is the standard entry point.
           make whisper
 
-      - name: Prepare Artifacts
+      - name: Build Libraries (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          make sources/whisper.cpp
+          cmake -S native -B build -G "Visual Studio 17 2022" -A x64 -DGGML_AVX=OFF -DGGML_AVX2=OFF -DGGML_AVX512=OFF -DGGML_FMA=OFF -DGGML_F16C=OFF -DGGML_BMI2=OFF
+          cmake --build build --config Release
+          copy build\Release\gowhisper.dll gowhisper-fallback.dll
+
+      - name: Prepare Artifacts (Linux & macOS)
+        if: runner.os != 'Windows'
         run: |
           mkdir artifacts
-          cp libgowhisper-*.so artifacts/
+          cp libgowhisper-*.so artifacts/ 2>/dev/null || cp libgowhisper-*.dylib artifacts/ 2>/dev/null || true
+
+      - name: Prepare Artifacts (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          mkdir artifacts
+          copy gowhisper-fallback.dll artifacts\
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
