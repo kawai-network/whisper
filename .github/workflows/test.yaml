@@ -74,6 +74,29 @@ jobs:
         run: |
           wget -q https://github.com/ggerganov/whisper.cpp/raw/master/samples/jfk.wav -O test/data/jfk.wav
 
+      - name: Verify Setup Before Tests
+        run: |
+          echo "=== Current Directory ==="
+          pwd
+          
+          echo -e "\n=== Listing .so files ==="
+          ls -lah *.so 2>/dev/null || echo "No .so files in current directory"
+          
+          echo -e "\n=== Checking if files are readable ==="
+          for f in libgowhisper-*.so; do
+            if [ -f "$f" ]; then
+              echo "$f: EXISTS and $([ -r "$f" ] && echo "READABLE" || echo "NOT READABLE")"
+              file "$f"
+            fi
+          done
+          
+          echo -e "\n=== Test data files ==="
+          ls -lah test/data/
+          
+          echo -e "\n=== Go module info ==="
+          go version
+          go env GOPATH GOROOT
+
       - name: Run Go Tests
         run: |
           go test -v ./...
