@@ -20,7 +20,7 @@ jobs:
 
       - name: Install Dependencies
         run: |
-          sudo apt-get update && sudo apt-get install -y ffmpeg build-essential cmake
+          sudo apt-get update && sudo apt-get install -y ffmpeg build-essential cmake libgomp1 libstdc++6
 
       - name: Get Libraries (Download or Build)
         run: |
