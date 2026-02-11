@@ -24,7 +24,6 @@ func ExampleLibraryDownloader_DownloadLatest() {
 	if err != nil {
 		log.Fatalf("Failed to initialize whisper: %v", err)
 	}
-	defer w.Close()
 
 	// Use whisper...
 	_ = w

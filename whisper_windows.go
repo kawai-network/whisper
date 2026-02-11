@@ -32,6 +32,11 @@ func registerLibFunc(fn interface{}, lib uintptr, name string) {
 	purego.RegisterFunc(fn, proc)
 }
 
+// closeLibrary unloads the DLL on Windows
+func closeLibrary(handle uintptr) error {
+	return windows.FreeLibrary(windows.Handle(handle))
+}
+
 // init registers the Go runtime for purego
 func init() {
 	// Ensure we're on Windows

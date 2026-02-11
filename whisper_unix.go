@@ -16,3 +16,8 @@ func loadLibrary(path string) (uintptr, error) {
 func registerLibFunc(fn interface{}, lib uintptr, name string) {
 	purego.RegisterLibFunc(fn, lib, name)
 }
+
+// closeLibrary unloads the shared library on Unix systems
+func closeLibrary(handle uintptr) error {
+	return purego.Dlclose(handle)
+}

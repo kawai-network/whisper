@@ -26,6 +26,7 @@ type Whisper struct {
 	cppNTokens                   func(i int) int
 	cppGetTokenID                func(i int, j int) int
 	cppGetSegmentSpeakerTurnNext func(i int) bool
+	libHandle                    uintptr
 }
 
 // New creates a new Whisper instance.
@@ -84,7 +85,17 @@ func New(libPath string) (*Whisper, error) {
 	registerLibFunc(&w.cppGetTokenID, lib, "get_token_id")
 	registerLibFunc(&w.cppGetSegmentSpeakerTurnNext, lib, "get_segment_speaker_turn_next")
 
+	w.libHandle = lib
+
 	return w, nil
+}
+
+// Close closes the Whisper instance and unloads the library
+func (w *Whisper) Close() error {
+	if w.libHandle != 0 {
+		return closeLibrary(w.libHandle)
+	}
+	return nil
 }
 
 func findBestLibrary(dir string) string {
