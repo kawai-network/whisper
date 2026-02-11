@@ -81,9 +81,28 @@ func New(libPath string) (*Whisper, error) {
 }
 
 func findBestLibrary(dir string) string {
-	if runtime.GOOS == "darwin" {
-		// macOS only has fallback/default
-		path := filepath.Join(dir, "libgowhisper-fallback.so")
+	// Platform-specific library extensions
+	ext := ".so"
+	prefix := "lib"
+
+	switch runtime.GOOS {
+	case "darwin":
+		// macOS uses .dylib or .so
+		ext = ".dylib"
+	case "windows":
+		// Windows uses .dll
+		ext = ".dll"
+		prefix = ""
+	}
+
+	// Windows and macOS only have fallback/default
+	if runtime.GOOS == "darwin" || runtime.GOOS == "windows" {
+		path := filepath.Join(dir, prefix+"gowhisper-fallback"+ext)
+		if _, err := os.Stat(path); err == nil {
+			return path
+		}
+		// Try without "-fallback" suffix for compatibility
+		path = filepath.Join(dir, prefix+"gowhisper"+ext)
 		if _, err := os.Stat(path); err == nil {
 			return path
 		}
