@@ -54,9 +54,15 @@ func New(libPath string) (*Whisper, error) {
 	}
 
 	// Load the library
-	lib, err := purego.Dlopen(path, purego.RTLD_NOW|purego.RTLD_GLOBAL)
+	// Convert to absolute path to ensure dlopen can find it
+	absPath, err := filepath.Abs(path)
 	if err != nil {
-		return nil, fmt.Errorf("failed to open library at %s: %w", path, err)
+		return nil, fmt.Errorf("failed to get absolute path for %s: %w", path, err)
+	}
+
+	lib, err := purego.Dlopen(absPath, purego.RTLD_NOW|purego.RTLD_GLOBAL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open library at %s: %w", absPath, err)
 	}
 
 	// Register function pointers
