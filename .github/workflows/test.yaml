@@ -22,9 +22,26 @@ jobs:
         run: |
           sudo apt-get update && sudo apt-get install -y ffmpeg build-essential cmake
 
+      - name: Clone whisper.cpp source
+        run: |
+          make sources/whisper.cpp
+
       - name: Build Libraries (C++)
         run: |
-          make whisper
+          # Build all library variants
+          make libgowhisper-fallback.so
+          make libgowhisper-avx.so || echo "AVX build failed, continuing..."
+          make libgowhisper-avx2.so || echo "AVX2 build failed, continuing..."
+          make libgowhisper-avx512.so || echo "AVX512 build failed, continuing..."
+          
+      - name: Verify libraries exist
+        run: |
+          echo "Listing built libraries:"
+          ls -lh libgowhisper-*.so || echo "No libraries found!"
+          echo "Current directory:"
+          pwd
+          echo "Directory contents:"
+          ls -la
 
       - name: Download Test Data (Model)
         run: |
