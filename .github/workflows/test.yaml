@@ -11,7 +11,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
       - uses: actions/checkout@v4
         with:
@@ -31,48 +31,42 @@ jobs:
         run: |
           brew install ffmpeg cmake
 
-      - name: Get Libraries (Download or Build)
+      - name: Install Dependencies (Windows)
+        if: runner.os == 'Windows'
         run: |
-          if [ "${{ runner.os }}" == "macOS" ]; then
-            echo "macOS detected, building from source to ensure compatibility..."
-            make sources/whisper.cpp
-            make libgowhisper-fallback.so
-            ls -lh libgowhisper-*.so
-            echo "Checking library dependencies (macOS):"
-            otool -L libgowhisper-fallback.so
-          else
-            # Linux: Try to download from latest release first
-            LATEST_TAG=$(curl -s https://api.github.com/repos/kawai-network/whisper/releases/latest | jq -r .tag_name)
+          choco install ffmpeg
+          echo "C:\ProgramData\chocolatey\bin" >> $env:GITHUB_PATH
+
+      - name: Setup MSVC (Windows)
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Get Libraries - Linux
+        if: runner.os == 'Linux'
+        run: |
+          # Linux: Try to download from latest release first
+          LATEST_TAG=$(curl -s https://api.github.com/repos/kawai-network/whisper/releases/latest | jq -r .tag_name)
+          
+          if [ "$LATEST_TAG" != "null" ] && [ -n "$LATEST_TAG" ]; then
+            echo "Found latest release: $LATEST_TAG"
+            echo "Attempting to download pre-built libraries..."
             
-            if [ "$LATEST_TAG" != "null" ] && [ -n "$LATEST_TAG" ]; then
-              echo "Found latest release: $LATEST_TAG"
-              echo "Attempting to download pre-built libraries..."
+            wget -q https://github.com/kawai-network/whisper/releases/download/$LATEST_TAG/libgowhisper-fallback.so -O libgowhisper-fallback.so && DOWNLOADED=true || DOWNLOADED=false
+            
+            if [ "$DOWNLOADED" = "true" ]; then
+              echo "Successfully downloaded libraries from release"
+              wget -q https://github.com/kawai-network/whisper/releases/download/$LATEST_TAG/libgowhisper-avx.so -O libgowhisper-avx.so || true
+              wget -q https://github.com/kawai-network/whisper/releases/download/$LATEST_TAG/libgowhisper-avx2.so -O libgowhisper-avx2.so || true
+              wget -q https://github.com/kawai-network/whisper/releases/download/$LATEST_TAG/libgowhisper-avx512.so -O libgowhisper-avx512.so || true
+              ls -lh libgowhisper-*.so
               
-              wget -q https://github.com/kawai-network/whisper/releases/download/$LATEST_TAG/libgowhisper-fallback.so -O libgowhisper-fallback.so && DOWNLOADED=true || DOWNLOADED=false
-              
-              if [ "$DOWNLOADED" = "true" ]; then
-                echo "Successfully downloaded libraries from release"
-                wget -q https://github.com/kawai-network/whisper/releases/download/$LATEST_TAG/libgowhisper-avx.so -O libgowhisper-avx.so || true
-                wget -q https://github.com/kawai-network/whisper/releases/download/$LATEST_TAG/libgowhisper-avx2.so -O libgowhisper-avx2.so || true
-                wget -q https://github.com/kawai-network/whisper/releases/download/$LATEST_TAG/libgowhisper-avx512.so -O libgowhisper-avx512.so || true
-                ls -lh libgowhisper-*.so
-                
-                echo "Checking library dependencies (Linux):"
-                for lib in libgowhisper-*.so; do
-                  echo "=== $lib ==="
-                  ldd "$lib" || echo "ldd failed for $lib"
-                done
-              else
-                echo "Download failed, building from source..."
-                make sources/whisper.cpp
-                make libgowhisper-fallback.so
-                make libgowhisper-avx.so || true
-                make libgowhisper-avx2.so || true
-                make libgowhisper-avx512.so || true
-                ls -lh libgowhisper-*.so
-              fi
+              echo "Checking library dependencies (Linux):"
+              for lib in libgowhisper-*.so; do
+                echo "=== $lib ==="
+                ldd "$lib" || echo "ldd failed for $lib"
+              done
             else
-              echo "No release found, building from source..."
+              echo "Download failed, building from source..."
               make sources/whisper.cpp
               make libgowhisper-fallback.so
               make libgowhisper-avx.so || true
@@ -80,27 +74,89 @@ jobs:
               make libgowhisper-avx512.so || true
               ls -lh libgowhisper-*.so
             fi
+          else
+            echo "No release found, building from source..."
+            make sources/whisper.cpp
+            make libgowhisper-fallback.so
+            make libgowhisper-avx.so || true
+            make libgowhisper-avx2.so || true
+            make libgowhisper-avx512.so || true
+            ls -lh libgowhisper-*.so
           fi
+
+      - name: Get Libraries - macOS
+        if: runner.os == 'macOS'
+        run: |
+          echo "macOS detected, building from source to ensure compatibility..."
+          make sources/whisper.cpp
+          make libgowhisper-fallback.so
+          ls -lh libgowhisper-*.so
+          echo "Checking library dependencies (macOS):"
+          otool -L libgowhisper-fallback.so
+
+      - name: Get Libraries - Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $LATEST_TAG = (Invoke-RestMethod -Uri "https://api.github.com/repos/kawai-network/whisper/releases/latest").tag_name
+          
+          if ($LATEST_TAG -and $LATEST_TAG -ne "null") {
+            Write-Host "Found latest release: $LATEST_TAG"
+            Write-Host "Attempting to download pre-built libraries..."
+            
+            $DLL_URL = "https://github.com/kawai-network/whisper/releases/download/$LATEST_TAG/gowhisper-fallback.dll"
+            
+            try {
+              Invoke-WebRequest -Uri $DLL_URL -OutFile "gowhisper-fallback.dll" -ErrorAction Stop
+              Write-Host "Successfully downloaded DLL from release"
+              ls gowhisper-fallback.dll
+            } catch {
+              Write-Host "Download failed, building from source..."
+              make sources/whisper.cpp
+              cmake -S native -B build -G "Visual Studio 17 2022" -A x64 -DGGML_AVX=OFF -DGGML_AVX2=OFF -DGGML_AVX512=OFF -DGGML_FMA=OFF -DGGML_F16C=OFF -DGGML_BMI2=OFF
+              cmake --build build --config Release
+              Copy-Item "build\Release\gowhisper.dll" -Destination "gowhisper-fallback.dll"
+              ls gowhisper-fallback.dll
+            }
+          } else {
+            Write-Host "No release found, building from source..."
+            make sources/whisper.cpp
+            cmake -S native -B build -G "Visual Studio 17 2022" -A x64 -DGGML_AVX=OFF -DGGML_AVX2=OFF -DGGML_AVX512=OFF -DGGML_FMA=OFF -DGGML_F16C=OFF -DGGML_BMI2=OFF
+            cmake --build build --config Release
+            Copy-Item "build\Release\gowhisper.dll" -Destination "gowhisper-fallback.dll"
+            ls gowhisper-fallback.dll
+          }
 
       - name: Download Test Data (Model)
         run: |
           mkdir -p test/data
-          wget -q https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.en.bin -O test/data/ggml-tiny.en.bin
+          if ($env:RUNNER_OS -eq "Windows") {
+            Invoke-WebRequest -Uri "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.en.bin" -OutFile "test/data/ggml-tiny.en.bin"
+          } else {
+            wget -q https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.en.bin -O test/data/ggml-tiny.en.bin
+          }
+        shell: pwsh
           
       - name: Download Test Data (Audio)
         run: |
-          wget -q https://github.com/ggerganov/whisper.cpp/raw/master/samples/jfk.wav -O test/data/jfk.wav
+          if ($env:RUNNER_OS -eq "Windows") {
+            Invoke-WebRequest -Uri "https://github.com/ggerganov/whisper.cpp/raw/master/samples/jfk.wav" -OutFile "test/data/jfk.wav"
+          } else {
+            wget -q https://github.com/ggerganov/whisper.cpp/raw/master/samples/jfk.wav -O test/data/jfk.wav
+          }
+        shell: pwsh
 
-      - name: Verify Setup Before Tests
+      - name: Verify Setup Before Tests - Unix
+        if: runner.os != 'Windows'
         run: |
           echo "=== Current Directory ==="
           pwd
           
-          echo -e "\n=== Listing .so files ==="
-          ls -lah *.so 2>/dev/null || echo "No .so files in current directory"
+          echo -e "\n=== Listing library files ==="
+          ls -lah *.so 2>/dev/null || ls -lah *.dylib 2>/dev/null || echo "No library files in current directory"
           
           echo -e "\n=== Checking if files are readable ==="
-          for f in libgowhisper-*.so; do
+          for f in libgowhisper-*.so libgowhisper-*.dylib 2>/dev/null; do
             if [ -f "$f" ]; then
               echo "$f: EXISTS and $([ -r "$f" ] && echo "READABLE" || echo "NOT READABLE")"
               file "$f"
@@ -113,6 +169,32 @@ jobs:
           echo -e "\n=== Go module info ==="
           go version
           go env GOPATH GOROOT
+
+      - name: Verify Setup Before Tests - Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Write-Host "=== Current Directory ==="
+          Get-Location
+          
+          Write-Host "`n=== Listing library files ==="
+          Get-ChildItem -Filter "*.dll" | Select-Object Name, Length
+          
+          Write-Host "`n=== Checking if DLL exists ==="
+          if (Test-Path "gowhisper-fallback.dll") {
+            Write-Host "gowhisper-fallback.dll: EXISTS"
+            Get-Item "gowhisper-fallback.dll" | Select-Object Name, Length, LastWriteTime
+          } else {
+            Write-Host "gowhisper-fallback.dll: NOT FOUND"
+          }
+          
+          Write-Host "`n=== Test data files ==="
+          Get-ChildItem -Path "test/data" -Recurse | Select-Object Name, Length
+          
+          Write-Host "`n=== Go module info ==="
+          go version
+          go env GOPATH
+          go env GOROOT
 
       - name: Run Go Tests
         run: |
