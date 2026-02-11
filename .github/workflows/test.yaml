@@ -89,10 +89,10 @@ jobs:
         run: |
           echo "macOS detected, building from source to ensure compatibility..."
           make sources/whisper.cpp
-          make libgowhisper-fallback.so
-          ls -lh libgowhisper-*.so
+          make libgowhisper-fallback.dylib
+          ls -lh libgowhisper-*.dylib
           echo "Checking library dependencies (macOS):"
-          otool -L libgowhisper-fallback.so
+          otool -L libgowhisper-fallback.dylib
 
       - name: Get Libraries - Windows
         if: runner.os == 'Windows'
@@ -156,12 +156,12 @@ jobs:
           ls -lah *.so 2>/dev/null || ls -lah *.dylib 2>/dev/null || echo "No library files in current directory"
           
           echo -e "\n=== Checking if files are readable ==="
-          for f in libgowhisper-*.so libgowhisper-*.dylib 2>/dev/null; do
+          for f in libgowhisper-*.so libgowhisper-*.dylib; do
             if [ -f "$f" ]; then
               echo "$f: EXISTS and $([ -r "$f" ] && echo "READABLE" || echo "NOT READABLE")"
               file "$f"
             fi
-          done
+          done 2>/dev/null || true
           
           echo -e "\n=== Test data files ==="
           ls -lah test/data/
