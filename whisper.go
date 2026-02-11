@@ -32,6 +32,7 @@ type Whisper struct {
 // If libPath is a file, it loads that file.
 // If libPath is a directory, it attempts to find the best available library in that directory.
 // If libPath is empty, it attempts to find the best available library in the current directory or defaults.
+// If no library is found, it automatically downloads the latest release.
 func New(libPath string) (*Whisper, error) {
 	w := &Whisper{}
 
@@ -46,7 +47,14 @@ func New(libPath string) (*Whisper, error) {
 	if err == nil && info.IsDir() {
 		path = findBestLibrary(libPath)
 		if path == "" {
-			return nil, fmt.Errorf("no suitable whisper library found in %s", libPath)
+			// Library not found, try to auto-download
+			fmt.Printf("Library not found in %s, attempting to download...\n", libPath)
+			downloader := NewLibraryDownloader(libPath)
+			path, err = downloader.DownloadLatest()
+			if err != nil {
+				return nil, fmt.Errorf("no suitable whisper library found in %s and auto-download failed: %w", libPath, err)
+			}
+			fmt.Printf("Library downloaded to: %s\n", path)
 		}
 	} else {
 		path = libPath

@@ -37,14 +37,6 @@ jobs:
           choco install ffmpeg
           echo "C:\ProgramData\chocolatey\bin" >> $env:GITHUB_PATH
 
-      - name: Setup MSVC (Windows)
-        if: runner.os == 'Windows'
-        uses: ilammy/msvc-dev-cmd@v1
-
-      - name: Get Libraries
-        run: |
-          go run -tags=download ./cmd/download-libs.go
-
       - name: Download Test Data (Model)
         run: |
           mkdir -p test/data
