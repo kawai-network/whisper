@@ -195,6 +195,21 @@ jobs:
           if (Test-Path "gowhisper-fallback.dll") {
             Write-Host "gowhisper-fallback.dll: EXISTS"
             Get-Item "gowhisper-fallback.dll" | Select-Object Name, Length, LastWriteTime
+            
+            Write-Host "`n=== Checking DLL dependencies ==="
+            # Use dumpbin to check dependencies
+            & "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC\14.44.35207\bin\Hostx64\x64\dumpbin.exe" /dependents gowhisper-fallback.dll
+            
+            Write-Host "`n=== Checking DLL exports ==="
+            & "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC\14.44.35207\bin\Hostx64\x64\dumpbin.exe" /exports gowhisper-fallback.dll
+            
+            Write-Host "`n=== Trying to load DLL with PowerShell ==="
+            try {
+              $dll = [System.Reflection.Assembly]::LoadFrom("$PWD\gowhisper-fallback.dll")
+              Write-Host "DLL loaded successfully via PowerShell"
+            } catch {
+              Write-Host "Failed to load DLL via PowerShell: $_"
+            }
           } else {
             Write-Host "gowhisper-fallback.dll: NOT FOUND"
           }
