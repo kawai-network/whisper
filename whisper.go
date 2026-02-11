@@ -9,7 +9,6 @@ import (
 	"strings"
 	"unsafe"
 
-	"github.com/ebitengine/purego"
 	"github.com/go-audio/wav"
 	"github.com/klauspost/cpuid/v2"
 )
@@ -60,22 +59,22 @@ func New(libPath string) (*Whisper, error) {
 		return nil, fmt.Errorf("failed to get absolute path for %s: %w", path, err)
 	}
 
-	lib, err := purego.Dlopen(absPath, purego.RTLD_NOW|purego.RTLD_GLOBAL)
+	lib, err := loadLibrary(absPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open library at %s: %w", absPath, err)
 	}
 
 	// Register function pointers
-	purego.RegisterLibFunc(&w.cppLoadModel, lib, "load_model")
-	purego.RegisterLibFunc(&w.cppLoadModelVAD, lib, "load_model_vad")
-	purego.RegisterLibFunc(&w.cppVAD, lib, "vad")
-	purego.RegisterLibFunc(&w.cppTranscribe, lib, "transcribe")
-	purego.RegisterLibFunc(&w.cppGetSegmentText, lib, "get_segment_text")
-	purego.RegisterLibFunc(&w.cppGetSegmentStart, lib, "get_segment_t0")
-	purego.RegisterLibFunc(&w.cppGetSegmentEnd, lib, "get_segment_t1")
-	purego.RegisterLibFunc(&w.cppNTokens, lib, "n_tokens")
-	purego.RegisterLibFunc(&w.cppGetTokenID, lib, "get_token_id")
-	purego.RegisterLibFunc(&w.cppGetSegmentSpeakerTurnNext, lib, "get_segment_speaker_turn_next")
+	registerLibFunc(&w.cppLoadModel, lib, "load_model")
+	registerLibFunc(&w.cppLoadModelVAD, lib, "load_model_vad")
+	registerLibFunc(&w.cppVAD, lib, "vad")
+	registerLibFunc(&w.cppTranscribe, lib, "transcribe")
+	registerLibFunc(&w.cppGetSegmentText, lib, "get_segment_text")
+	registerLibFunc(&w.cppGetSegmentStart, lib, "get_segment_t0")
+	registerLibFunc(&w.cppGetSegmentEnd, lib, "get_segment_t1")
+	registerLibFunc(&w.cppNTokens, lib, "n_tokens")
+	registerLibFunc(&w.cppGetTokenID, lib, "get_token_id")
+	registerLibFunc(&w.cppGetSegmentSpeakerTurnNext, lib, "get_segment_speaker_turn_next")
 
 	return w, nil
 }
