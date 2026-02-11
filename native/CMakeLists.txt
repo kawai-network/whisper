@@ -29,5 +29,8 @@ if(WIN32)
     # On Windows, the output is a .dll file
     if(MSVC)
         target_compile_options(gowhisper PRIVATE /W4)
+        # Use static runtime to avoid dependency on VC++ Redistributable
+        set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+        target_compile_options(gowhisper PRIVATE /MT)
     endif()
 endif()
