@@ -172,28 +172,15 @@ func (d *LibraryDownloader) detectVariant(filename string) string {
 }
 
 func (d *LibraryDownloader) selectBestVariant(candidates []LibraryAsset, platform *PlatformInfo) *LibraryAsset {
-	if platform.OS != "linux" {
-		// macOS and Windows only have fallback
-		for _, c := range candidates {
-			if c.Variant == "fallback" {
-				return &c
-			}
-		}
-		return &candidates[0]
-	}
-
-	// Linux: Try to select best variant based on CPU capabilities
-	// This is simplified - in production, you'd use cpuid library
-	priority := []string{"avx512", "avx2", "avx", "fallback"}
-
-	for _, variant := range priority {
-		for _, c := range candidates {
-			if c.Variant == variant {
-				return &c
-			}
+	// Always use fallback variant for maximum compatibility
+	// This avoids SIGILL errors on CPUs that don't support AVX/AVX2/AVX512
+	for _, c := range candidates {
+		if c.Variant == "fallback" {
+			return &c
 		}
 	}
 
+	// Fallback to first available if no fallback found
 	return &candidates[0]
 }
 
