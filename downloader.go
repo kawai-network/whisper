@@ -201,8 +201,16 @@ func (d *LibraryDownloader) selectBestVariant(candidates []LibraryAsset, platfor
 	return &candidates[0]
 }
 
+// ProgressCallback is called during download to report progress
+type ProgressCallback func(bytesComplete, totalBytes int64, mbps float64, done bool)
+
 // Download downloads the library with resume support
 func (d *LibraryDownloader) Download(asset *LibraryAsset) (string, error) {
+	return d.DownloadWithProgress(asset, nil)
+}
+
+// DownloadWithProgress downloads the library with progress callback
+func (d *LibraryDownloader) DownloadWithProgress(asset *LibraryAsset, progress ProgressCallback) (string, error) {
 	// Ensure target directory exists
 	if err := os.MkdirAll(d.targetDir, 0755); err != nil {
 		return "", fmt.Errorf("failed to create target directory: %w", err)
@@ -232,6 +240,37 @@ func (d *LibraryDownloader) Download(asset *LibraryAsset) (string, error) {
 	// Start download
 	resp := d.client.Do(req)
 
+	// Monitor progress if callback provided
+	if progress != nil {
+		startTime := time.Now()
+		t := time.NewTicker(100 * time.Millisecond)
+		defer t.Stop()
+
+		for {
+			select {
+			case <-t.C:
+				bytesComplete := resp.BytesComplete()
+				totalBytes := resp.Size()
+				elapsed := time.Since(startTime).Seconds()
+				var mbps float64
+				if elapsed > 0 {
+					mbps = float64(bytesComplete) / (1024 * 1024) / elapsed
+				}
+				progress(bytesComplete, totalBytes, mbps, false)
+			default:
+				if resp.IsComplete() {
+					bytesComplete := resp.BytesComplete()
+					progress(bytesComplete, bytesComplete, 0, true)
+					if err := resp.Err(); err != nil {
+						return "", fmt.Errorf("download failed: %w", err)
+					}
+					return outputPath, nil
+				}
+				time.Sleep(50 * time.Millisecond)
+			}
+		}
+	}
+
 	// Wait for download to complete
 	if err := resp.Err(); err != nil {
 		return "", fmt.Errorf("download failed: %w", err)
@@ -242,6 +281,11 @@ func (d *LibraryDownloader) Download(asset *LibraryAsset) (string, error) {
 
 // DownloadLatest downloads the latest library for the current platform
 func (d *LibraryDownloader) DownloadLatest() (string, error) {
+	return d.DownloadLatestWithProgress(nil)
+}
+
+// DownloadLatestWithProgress downloads with progress callback
+func (d *LibraryDownloader) DownloadLatestWithProgress(progress ProgressCallback) (string, error) {
 	// Detect platform
 	platform := DetectPlatform()
 	fmt.Printf("Detected platform: %s/%s\n", platform.OS, platform.Arch)
@@ -261,8 +305,8 @@ func (d *LibraryDownloader) DownloadLatest() (string, error) {
 	fmt.Printf("Selected library: %s (%s variant, %d bytes)\n",
 		asset.Name, asset.Variant, asset.Size)
 
-	// Download with resume support
-	path, err := d.Download(asset)
+	// Download with progress
+	path, err := d.DownloadWithProgress(asset, progress)
 	if err != nil {
 		return "", err
 	}
