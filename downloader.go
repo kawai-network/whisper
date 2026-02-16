@@ -74,6 +74,23 @@ func DetectPlatform() *PlatformInfo {
 	return info
 }
 
+// LibraryName returns the platform-specific library name for the given OS
+func LibraryName(goos string) string {
+	var prefix, extension string
+	switch goos {
+	case "darwin":
+		prefix = "lib"
+		extension = ".dylib"
+	case "windows":
+		prefix = ""
+		extension = ".dll"
+	default: // Linux
+		prefix = "lib"
+		extension = ".so"
+	}
+	return prefix + "gowhisper" + extension
+}
+
 // GetLatestRelease fetches the latest release info from GitHub
 func (d *LibraryDownloader) GetLatestRelease() (*ReleaseInfo, error) {
 	client := &http.Client{Timeout: 10 * time.Second}
