@@ -5,7 +5,6 @@ go 1.25.5
 require (
 	github.com/ebitengine/purego v0.9.1
 	github.com/go-audio/wav v1.1.0
-	github.com/kawai-network/grab v0.1.0
 	golang.org/x/sys v0.30.0
 )
 

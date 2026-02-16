@@ -2,11 +2,40 @@ package whisper
 
 import (
 	"os"
+	"path/filepath"
+	"runtime"
 	"testing"
 )
 
+func skipIfNoLibrary(t *testing.T) {
+	t.Helper()
+	libName := LibraryName(runtime.GOOS)
+	libFile := filepath.Join(".", libName)
+	if _, err := os.Stat(libFile); os.IsNotExist(err) {
+		t.Skipf("Skipping test: library not found at %s. Download from https://github.com/kawai-network/whisper/releases/latest", libFile)
+	}
+}
+
+func skipIfNoModel(t *testing.T, modelPath string) {
+	t.Helper()
+	if _, err := os.Stat(modelPath); os.IsNotExist(err) {
+		t.Skipf("Skipping test: model file not found at %s", modelPath)
+	}
+}
+
+func skipIfNoAudio(t *testing.T, audioPath string) {
+	t.Helper()
+	if _, err := os.Stat(audioPath); os.IsNotExist(err) {
+		t.Skipf("Skipping test: audio file not found at %s", audioPath)
+	}
+}
+
 func TestLibraryLoading(t *testing.T) {
-	// Test that we can load the library
+	if testing.Short() {
+		t.Skip("Skipping in short mode")
+	}
+	skipIfNoLibrary(t)
+
 	w, err := New(".")
 	if err != nil {
 		t.Fatalf("Failed to initialize whisper: %v", err)
@@ -18,17 +47,14 @@ func TestLibraryLoading(t *testing.T) {
 
 func TestModelLoading(t *testing.T) {
 	modelPath := "test/data/ggml-tiny.en.bin"
-
-	if _, err := os.Stat(modelPath); os.IsNotExist(err) {
-		t.Skipf("Skipping test: model file not found at %s", modelPath)
-	}
+	skipIfNoLibrary(t)
+	skipIfNoModel(t, modelPath)
 
 	w, err := New(".")
 	if err != nil {
 		t.Fatalf("Failed to initialize whisper: %v", err)
 	}
 
-	// Test loading transcription model
 	if err := w.Load(modelPath); err != nil {
 		t.Fatalf("Failed to load model: %v", err)
 	}
@@ -37,13 +63,9 @@ func TestModelLoading(t *testing.T) {
 func TestTranscribeBasic(t *testing.T) {
 	modelPath := "test/data/ggml-tiny.en.bin"
 	audioPath := "test/data/jfk.wav"
-
-	if _, err := os.Stat(modelPath); os.IsNotExist(err) {
-		t.Skipf("Skipping test: model file not found at %s", modelPath)
-	}
-	if _, err := os.Stat(audioPath); os.IsNotExist(err) {
-		t.Skipf("Skipping test: audio file not found at %s", audioPath)
-	}
+	skipIfNoLibrary(t)
+	skipIfNoModel(t, modelPath)
+	skipIfNoAudio(t, audioPath)
 
 	w, err := New(".")
 	if err != nil {
@@ -64,7 +86,6 @@ func TestTranscribeBasic(t *testing.T) {
 		t.Fatalf("Failed to transcribe: %v", err)
 	}
 
-	// Assertions
 	if len(res.Text) == 0 {
 		t.Error("Expected transcription text, got empty string")
 	}
@@ -73,7 +94,6 @@ func TestTranscribeBasic(t *testing.T) {
 		t.Error("Expected at least one segment")
 	}
 
-	// Log the result for manual verification
 	t.Logf("Transcription: %s", res.Text)
 	t.Logf("Number of segments: %d", len(res.Segments))
 }
@@ -81,13 +101,9 @@ func TestTranscribeBasic(t *testing.T) {
 func TestTranscribeWithMultipleThreads(t *testing.T) {
 	modelPath := "test/data/ggml-tiny.en.bin"
 	audioPath := "test/data/jfk.wav"
-
-	if _, err := os.Stat(modelPath); os.IsNotExist(err) {
-		t.Skipf("Skipping test: model file not found at %s", modelPath)
-	}
-	if _, err := os.Stat(audioPath); os.IsNotExist(err) {
-		t.Skipf("Skipping test: audio file not found at %s", audioPath)
-	}
+	skipIfNoLibrary(t)
+	skipIfNoModel(t, modelPath)
+	skipIfNoAudio(t, audioPath)
 
 	w, err := New(".")
 	if err != nil {
@@ -100,7 +116,7 @@ func TestTranscribeWithMultipleThreads(t *testing.T) {
 
 	opts := TranscriptionOptions{
 		Language: "en",
-		Threads:  4, // Use multiple threads
+		Threads:  4,
 	}
 
 	res, err := w.Transcribe(audioPath, opts)
@@ -118,13 +134,9 @@ func TestTranscribeWithMultipleThreads(t *testing.T) {
 func TestTranscribeWithDiarization(t *testing.T) {
 	modelPath := "test/data/ggml-tiny.en.bin"
 	audioPath := "test/data/jfk.wav"
-
-	if _, err := os.Stat(modelPath); os.IsNotExist(err) {
-		t.Skipf("Skipping test: model file not found at %s", modelPath)
-	}
-	if _, err := os.Stat(audioPath); os.IsNotExist(err) {
-		t.Skipf("Skipping test: audio file not found at %s", audioPath)
-	}
+	skipIfNoLibrary(t)
+	skipIfNoModel(t, modelPath)
+	skipIfNoAudio(t, audioPath)
 
 	w, err := New(".")
 	if err != nil {
@@ -138,7 +150,7 @@ func TestTranscribeWithDiarization(t *testing.T) {
 	opts := TranscriptionOptions{
 		Language: "en",
 		Threads:  2,
-		Diarize:  true, // Enable speaker diarization
+		Diarize:  true,
 	}
 
 	res, err := w.Transcribe(audioPath, opts)
@@ -156,13 +168,9 @@ func TestTranscribeWithDiarization(t *testing.T) {
 func TestSegmentDetails(t *testing.T) {
 	modelPath := "test/data/ggml-tiny.en.bin"
 	audioPath := "test/data/jfk.wav"
-
-	if _, err := os.Stat(modelPath); os.IsNotExist(err) {
-		t.Skipf("Skipping test: model file not found at %s", modelPath)
-	}
-	if _, err := os.Stat(audioPath); os.IsNotExist(err) {
-		t.Skipf("Skipping test: audio file not found at %s", audioPath)
-	}
+	skipIfNoLibrary(t)
+	skipIfNoModel(t, modelPath)
+	skipIfNoAudio(t, audioPath)
 
 	w, err := New(".")
 	if err != nil {
@@ -183,7 +191,6 @@ func TestSegmentDetails(t *testing.T) {
 		t.Fatalf("Failed to transcribe: %v", err)
 	}
 
-	// Check segment details
 	for i, seg := range res.Segments {
 		if seg.Start >= seg.End {
 			t.Errorf("Segment %d: start time (%d) should be less than end time (%d)", i, seg.Start, seg.End)
@@ -200,6 +207,11 @@ func TestSegmentDetails(t *testing.T) {
 }
 
 func TestInvalidModelPath(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping in short mode")
+	}
+	skipIfNoLibrary(t)
+
 	w, err := New(".")
 	if err != nil {
 		t.Fatalf("Failed to initialize whisper: %v", err)
@@ -213,9 +225,8 @@ func TestInvalidModelPath(t *testing.T) {
 
 func TestInvalidAudioPath(t *testing.T) {
 	modelPath := "test/data/ggml-tiny.en.bin"
-	if _, err := os.Stat(modelPath); os.IsNotExist(err) {
-		t.Skip("Model file not found")
-	}
+	skipIfNoLibrary(t)
+	skipIfNoModel(t, modelPath)
 
 	w, err := New(".")
 	if err != nil {

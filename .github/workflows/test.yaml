@@ -37,6 +37,22 @@ jobs:
           choco install ffmpeg
           echo "C:\ProgramData\chocolatey\bin" >> $env:GITHUB_PATH
 
+      - name: Download gowhisper library (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          wget -q https://github.com/kawai-network/whisper/releases/latest/download/libgowhisper-fallback.so -O libgowhisper-fallback.so
+
+      - name: Download gowhisper library (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          wget -q https://github.com/kawai-network/whisper/releases/latest/download/libgowhisper-fallback.dylib -O libgowhisper-fallback.dylib
+
+      - name: Download gowhisper library (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          Invoke-WebRequest -Uri "https://github.com/kawai-network/whisper/releases/latest/download/gowhisper-fallback.dll" -OutFile "gowhisper-fallback.dll"
+        shell: pwsh
+
       - name: Download Test Data (Model)
         run: |
           mkdir -p test/data

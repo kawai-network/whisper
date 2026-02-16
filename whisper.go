@@ -31,13 +31,12 @@ type Whisper struct {
 // New creates a new Whisper instance.
 // If libPath is a file, it loads that file.
 // If libPath is a directory, it attempts to find the best available library in that directory.
-// If libPath is empty, it attempts to find the best available library in the current directory or defaults.
-// If no library is found, it automatically downloads the latest release.
+// If libPath is empty, it attempts to find the best available library in the current directory.
+// Returns an error if no library is found.
 func New(libPath string) (*Whisper, error) {
 	w := &Whisper{}
 
 	var path string
-	var err error
 
 	if libPath == "" {
 		libPath = "."
@@ -47,14 +46,7 @@ func New(libPath string) (*Whisper, error) {
 	if err == nil && info.IsDir() {
 		path = findBestLibrary(libPath)
 		if path == "" {
-			// Library not found, try to auto-download
-			fmt.Printf("Library not found in %s, attempting to download...\n", libPath)
-			downloader := NewLibraryDownloader(libPath)
-			path, err = downloader.DownloadLatest()
-			if err != nil {
-				return nil, fmt.Errorf("no suitable whisper library found in %s and auto-download failed: %w", libPath, err)
-			}
-			fmt.Printf("Library downloaded to: %s\n", path)
+			return nil, fmt.Errorf("no suitable whisper library found in %s. Download the library first or provide a valid path", libPath)
 		}
 	} else {
 		path = libPath
@@ -120,6 +112,24 @@ func findBestLibrary(dir string) string {
 	}
 
 	return ""
+}
+
+// LibraryName returns the platform-specific library name for the given OS.
+// Pass runtime.GOOS for the current platform.
+func LibraryName(goos string) string {
+	var prefix, extension string
+	switch goos {
+	case "darwin":
+		prefix = "lib"
+		extension = ".dylib"
+	case "windows":
+		prefix = ""
+		extension = ".dll"
+	default: // Linux
+		prefix = "lib"
+		extension = ".so"
+	}
+	return prefix + "gowhisper-fallback" + extension
 }
 
 // ModelOptions represents options for loading a model
